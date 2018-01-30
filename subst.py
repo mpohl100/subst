@@ -424,6 +424,7 @@ def parse_args(args):
                    help='show more informations')
     p.add_argument('-v', '--version', action='version',
         version="%s %s\n%s" % (os.path.basename(sys.argv[0]), __version__, args_description))
+    p.add_argument('-n', '--nothing', type=int, choices=[0,1], help='if set to 1, do nothing and print all replacements')
     p.add_argument('files', nargs='*', type=str,
                    help='files to parse')
 
@@ -498,6 +499,28 @@ def replace_linear(src, dst, pattern, replace, count):
         if IS_PY2 and isinstance(line, unicode):
             line = line.encode(FILE_ENCODING)
         dst.write(line)
+    return ret
+
+def replace_linear_nothing(src, dst, pattern, replace, count):
+    """ Read data from 'src' line by line, replace some data from
+    regular expression in 'pattern' with data in 'replace',
+    write it to 'dst', and return quantity of replaces.
+    Print all replacements that would be done to the console.
+    """
+    ret = 0
+    for line in src:
+        orig = line
+        if count == 0 or ret < count:
+            if IS_PY2 and not isinstance(line, unicode):
+                line = u(line, FILE_ENCODING)
+            line, rest_count = pattern.subn(replace, line, max(0, count - ret))
+            ret += rest_count
+
+        if IS_PY2 and isinstance(line, unicode):
+            line = line.encode(FILE_ENCODING)
+        print(orig)
+        print(line)
+        print()
     return ret
 
 
@@ -626,6 +649,9 @@ def main(args):
         replace_func = replace_linear
     else:
         replace_func = replace_global
+
+    if args.nothing:
+        replace_func = replace_linear_nothing
 
     if args.stdin:
         cnt_changes = replace_func(sys.stdin, sys.stdout, args.pattern, args.replace, args.count)
