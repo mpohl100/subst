@@ -326,6 +326,10 @@ def _parse_args__prepare_paths(files, expand_wildcards):
     """
     Prepare paths for processing
     """
+    print(files)
+    if not isinstance(files,list):
+        print('is not list')
+
     if not IS_WIN:
         files = [u(path, INPUT_ENCODING) for path in files]
 
@@ -425,11 +429,11 @@ def parse_args(args):
     p.add_argument('-v', '--version', action='version',
         version="%s %s\n%s" % (os.path.basename(sys.argv[0]), __version__, args_description))
     p.add_argument('-n', '--nothing', type=int, choices=[0,1], help='if set to 1, do nothing and print all replacements')
-    p.add_argument('files', nargs='*', type=str,
+    p.add_argument('files', nargs='*', type=str, default='./*',
                    help='files to parse')
 
     args = p.parse_args(args)
-
+    print('parsed args')
     if args.utf8:
         INPUT_ENCODING = FILE_ENCODING = FILESYSTEM_ENCODING = 'utf8'
         args.encoding_input = args.encoding_file = args.encoding_filesystem = 'utf8'
@@ -455,7 +459,7 @@ def parse_args(args):
     if args.stdin:
         args.stdout = True
 
-    if args.stdout:
+    if args.stdout or args.nothing == 1:
         args.no_backup = True
 
     # pylint: disable=too-many-boolean-expressions
@@ -518,9 +522,10 @@ def replace_linear_nothing(src, dst, pattern, replace, count):
 
         if IS_PY2 and isinstance(line, unicode):
             line = line.encode(FILE_ENCODING)
-        print(orig)
-        print(line)
-        print()
+        if orig != line:
+            print(orig.strip('\n'))
+            print(line.strip('\n'))
+            print()
     return ret
 
 
@@ -593,6 +598,13 @@ def _process_file__regular(src_path, cfg, replace_func):
     # pylint: disable=bare-except
     except:
         pass
+    if cfg.nothing > 0:
+        try:
+            os.remove(tmp_path)
+        except OSError as ex:
+            pass
+        return cnt
+
 
     try:
         shutil.move(tmp_path, src_path)
@@ -618,7 +630,8 @@ def process_file(path, replace_func, cfg):
     if not os.path.isfile(path) or os.path.islink(path):
         raise SubstException('Path "%s" is not a regular file' % path)
 
-    if not cfg.no_backup:
+    print(cfg.no_backup)
+    if not cfg.no_backup or cfg.nothing == 0:
         backup_path = _process_file__make_backup(path, cfg.ext)
 
         if cfg.debug:
@@ -650,7 +663,7 @@ def main(args):
     else:
         replace_func = replace_global
 
-    if args.nothing:
+    if args.nothing > 0:
         replace_func = replace_linear_nothing
 
     if args.stdin:
